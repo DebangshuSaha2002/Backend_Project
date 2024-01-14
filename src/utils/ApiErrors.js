@@ -13,3 +13,5 @@ class ApiError extends Error{
         this.errors=errors;
     }
 }
+
+export {ApiError}
