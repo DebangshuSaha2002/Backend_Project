@@ -18,7 +18,7 @@ const generateAccessAndRefreshTokens = async(userId) =>{
 
 
     } catch (error) {
-        throw new ApiError(500, "Something went wrong while generating referesh and access token")
+        throw new ApiError(500, "Something went wrong while generating refresh and access token")
     }
 }
 
@@ -101,7 +101,7 @@ const loginUser = asyncHandler(async (req, res) =>{
     // username or email
     //find the user
     //password check
-    //access and referesh token
+    //access and refresh token
     //send cookie
 
     const {email, username, password} = req.body
