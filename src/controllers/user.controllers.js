@@ -218,4 +218,63 @@ const RefreshAccessToken=asyncHandler(async(req,res)=>{
     }
 })
 
-export {registerUser,loginUser,logOutUser,RefreshAccessToken}
+const changeCurrentPassword=asyncHandler(async(req,res)=>{
+    const {currentPassword,newPassword,confirmNewPassword}=req.body
+
+    if(
+        [currentPassword,newPassword,confirmNewPassword].some((fields)=>fields.trims()==="")
+    ){
+        throw new ApiError(400,"All Fields are required")
+    }    
+
+    const user=await Users.findById(req?.user?._id)
+    const isPasswordCorrect=await isPasswordCorrect(currentPassword)
+
+    if(!isPasswordCorrect){
+        throw new ApiError(400,"Current Password is not Corect")
+    }
+
+    if(newPassword!==confirmNewPassword){
+        throw new ApiError(400,"New Password and Confirm Password does not match")
+    }
+
+    user.password=newPassword
+    await user.save({validateBeforeSave:false})
+    return res.status(200).json(new ApiResponse(200,{},"Password is set successfully"))
+
+})
+
+const getCurrentUser=asyncHandler(async(req,res)=>{
+    res.status(200)
+    .json(new ApiResponse(200,req?.user,"Current user data fetched successfully"))
+})
+
+const updateUserProfile=asyncHandler(async(req,res)=>{
+    const {fullName,email}=req.body
+    if(!fullName || !email){
+        throw new ApiError(400,"FullName and email is required")
+    }
+
+    const user=await Users.findByIdAndUpdate(req?.user?._id,
+        {
+            $set:
+            {
+                fullName:fullName,
+                email:email
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse
+        (200,
+            user,
+            "User Profile Updated Successfully"
+        )
+    )
+})
+
+export {registerUser,loginUser,logOutUser,RefreshAccessToken,changeCurrentPassword,getCurrentUser}
