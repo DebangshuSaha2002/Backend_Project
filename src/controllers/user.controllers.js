@@ -277,4 +277,52 @@ const updateUserProfile=asyncHandler(async(req,res)=>{
     )
 })
 
-export {registerUser,loginUser,logOutUser,RefreshAccessToken,changeCurrentPassword,getCurrentUser}
+const updateUserAvatar=asyncHandler(async(req,res)=>{
+    const avatarLocalPath=await req?.file?.avatar[0].path
+    if(!avatarLocalPath){
+        throw new ApiError(400,"Avatar File Path Not Available")
+    }
+
+    const avatar=await uploadOnCloudinary(avatarLocalPath)
+
+    if(!avatar){
+        throw new ApiError(400,"Avatar File Upload on cloudinary failed")
+    }
+
+    const user=await Users.findById(req?.user?._id,{
+        $set:{
+            avatar:avatar?.url
+        },
+    },{
+        new:true
+    }).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse(200,user,"User Avatar Updated Successfully"))
+})
+
+const updateUserCoverImage=asyncHandler(async(req,res)=>{
+    const CoverImageLocalPath=await req?.file?.avatar[0].path
+    if(!CoverImageLocalPath){
+        throw new ApiError(400,"CoverImage File Path Not Available")
+    }
+
+    const coverImage=await uploadOnCloudinary(CoverImageLocalPath)
+
+    if(!coverImage){
+        throw new ApiError(400,"CoverImage File Upload on cloudinary failed")
+    }
+
+    const user=await Users.findById(req?.user?._id,{
+        $set:{
+            coverImage:coverImage?.url
+        },
+    },{
+        new:true
+    }).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse(200,user,"User CoverImage Updated Successfully"))
+})
+
+export {registerUser,loginUser,logOutUser,RefreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserProfile,updateUserAvatar,updateUserCoverImage}
