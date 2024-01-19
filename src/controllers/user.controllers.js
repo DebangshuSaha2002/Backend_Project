@@ -325,4 +325,74 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
     .json(new ApiResponse(200,user,"User CoverImage Updated Successfully"))
 })
 
-export {registerUser,loginUser,logOutUser,RefreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserProfile,updateUserAvatar,updateUserCoverImage}
+const getUserProfileData=asyncHandler(async(req,res)=>{
+    const username=req.params?.username.toLowerCase()
+
+    if(!username){
+        throw new ApiError(400,"username is not available")
+    }
+
+    Users.aggregate([
+        {
+            $match:{
+                username:username
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"username",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"username",
+                foreignField:"subscriber",
+                as:"subscribedTo"
+            }
+        },
+        {
+            $addFields:{
+                TotalSubcribersCount:{
+                    $size:"$subscribers"
+                },
+                TotalChannelSubscribedToCount:{
+                    $size:"$subscribedTo"
+                },
+                isSubscribed:{
+                    if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                    then:true,
+                    else:false
+                }
+            }
+        },
+        {
+            $project:{
+                username:1,
+                fullName:1,
+                email:1,
+                TotalSubcribersCount:1,
+                TotalChannelSubscribedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1
+            }
+        }
+    ])
+})
+
+export {
+    registerUser,
+    loginUser,
+    logOutUser,
+    RefreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateUserProfile,
+    updateUserAvatar,
+    updateUserCoverImage,
+    getUserProfileData
+}
