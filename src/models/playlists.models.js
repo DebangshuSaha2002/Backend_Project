@@ -9,12 +9,16 @@ const playlistSchema=new Schema({
         type:String,
         required:true,
     },
-    videos:{
-        type:Schema.Types.ObjectId,
-        ref:"video",
-    },
+    videos:[
+        {
+            type:Schema.Types.ObjectId,
+            ref:"video",
+        }
+    ],
     owner:{
         type:Schema.Types.ObjectId,
         ref:"user",
     }
 },{timestamps:true})
+
+export const Playlist=model("playlist",playlistSchema)
