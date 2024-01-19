@@ -4,7 +4,7 @@ import {Users} from "../models/users.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js" 
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
-
+import mongoose from "mongoose";
 const generateAccessAndRefreshTokens = async(userId) =>{
     try {
         const user = await Users.findById(userId)
@@ -178,13 +178,13 @@ const logOutUser=asyncHandler(async(req,res)=>{
 })
 
 const RefreshAccessToken=asyncHandler(async(req,res)=>{
-    try {
-        const incomingRefreshToken=await req.cookies.refreshToken || req.body.refreshToken
-        if(!incomingRefreshToken){
-            throw new ApiError(402,"Refresh Token is not available")
-        }
+    const incomingRefreshToken=await req.cookies.refreshToken || req.body.refreshToken
+    if(!incomingRefreshToken){
+        throw new ApiError(402,"Refresh Token is not available")
+    }
 
-        const decodedToken=jwt.verify(incomingRefreshToken,REFRESH_TOKEN_SECRET)
+    try {
+        const decodedToken=jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
 
         if(!decodedToken){
             throw new ApiError(402,"Problem with decoded Token")
@@ -195,7 +195,7 @@ const RefreshAccessToken=asyncHandler(async(req,res)=>{
             throw new ApiError(400,"No user exists with that ID")
         }
 
-        if(user?.refreshToken!==incomingRefreshToken){
+        if(incomingRefreshToken!==user?.refreshToken){
             throw new ApiError(402,"Refresh Token is Expired or used")
         }
 
@@ -222,16 +222,17 @@ const changeCurrentPassword=asyncHandler(async(req,res)=>{
     const {currentPassword,newPassword,confirmNewPassword}=req.body
 
     if(
-        [currentPassword,newPassword,confirmNewPassword].some((fields)=>fields.trims()==="")
+        [currentPassword,newPassword,confirmNewPassword].some((field)=>field?.trim()==="")
     ){
         throw new ApiError(400,"All Fields are required")
     }    
 
     const user=await Users.findById(req?.user?._id)
-    const isPasswordCorrect=await isPasswordCorrect(currentPassword)
+    const isPasswordCorrect=await user.isPasswordCorrect(currentPassword)
 
-    if(!isPasswordCorrect){
-        throw new ApiError(400,"Current Password is not Corect")
+    //problem with isPasswordCorrect Function
+    if(isPasswordCorrect){
+        throw new ApiError(400,"Current Password is not Correct")
     }
 
     if(newPassword!==confirmNewPassword){
@@ -332,16 +333,16 @@ const getUserProfileData=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"username is not available")
     }
 
-    Users.aggregate([
+    const channel=await Users.aggregate([
         {
             $match:{
-                username:username
+                username:username.toLowerCase()
             }
         },
         {
             $lookup:{
                 from:"subscriptions",
-                localField:"username",
+                localField:"_id",
                 foreignField:"channel",
                 as:"subscribers"
             }
@@ -349,7 +350,7 @@ const getUserProfileData=asyncHandler(async(req,res)=>{
         {
             $lookup:{
                 from:"subscriptions",
-                localField:"username",
+                localField:"_id",
                 foreignField:"subscriber",
                 as:"subscribedTo"
             }
@@ -363,9 +364,11 @@ const getUserProfileData=asyncHandler(async(req,res)=>{
                     $size:"$subscribedTo"
                 },
                 isSubscribed:{
-                    if:{$in:[req.user?._id,"$subscribers.subscriber"]},
-                    then:true,
-                    else:false
+                    $cond:{
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
                 }
             }
         },
@@ -382,6 +385,65 @@ const getUserProfileData=asyncHandler(async(req,res)=>{
             }
         }
     ])
+
+    if(!channel?.length){
+        throw new ApiError(404,"No channel found with this username")
+    }
+
+    return res.status(200)
+    .json(new ApiResponse(200,channel[0],"Channel Data Fetched Successfully"))
+})
+
+const getWatchHistory=asyncHandler(async(req,res)=>{
+    const user=await Users.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{
+                            owner:{
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res.status(200).
+    json(new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch History Fetched Successfully"
+        )
+    )
 })
 
 export {
@@ -394,5 +456,6 @@ export {
     updateUserProfile,
     updateUserAvatar,
     updateUserCoverImage,
-    getUserProfileData
+    getUserProfileData,
+    getWatchHistory
 }
