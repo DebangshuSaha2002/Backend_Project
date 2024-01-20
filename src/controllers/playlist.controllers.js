@@ -184,7 +184,7 @@ const deletePlaylist = asyncHandler(async (req, res) => {
         throw new ApiError(404,"Playlist not found with this playlist ID")
     }
 
-    const removingPlaylist=await fs.unlinkSync(playlistId)
+    const removingPlaylist=await Playlist.findByIdAndDelete(playlistId)
     if(!removingPlaylist){
         throw new ApiError(500,"Error while removing playlist")
     }
